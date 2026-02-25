@@ -98,4 +98,4 @@ Die Einstellungen werden unter `%APPDATA%/StickyAlarm/config.json` gespeichert:
 
 ## Lizenz
 
-MIT
+Dieses Projekt steht unter der [MIT-Lizenz](LICENSE).
