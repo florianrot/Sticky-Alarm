@@ -4,15 +4,17 @@ pip install -r requirements.txt pyinstaller
 
 echo.
 echo Building StickyAlarm.exe...
-pyinstaller --onefile --windowed --name="StickyAlarm" --icon=icon.ico ^
-    --add-data "config.py;." ^
-    --add-data "scheduler.py;." ^
-    --add-data "popup.py;." ^
-    --add-data "chrome_monitor.py;." ^
-    --add-data "settings_window.py;." ^
-    --add-data "autostart.py;." ^
+pyinstaller --onefile --windowed --name="StickyAlarm" --icon=assets/icon.ico ^
+    --add-data "src/config.py;." ^
+    --add-data "src/scheduler.py;." ^
+    --add-data "src/popup.py;." ^
+    --add-data "src/chrome_monitor.py;." ^
+    --add-data "src/settings_window.py;." ^
+    --add-data "src/autostart.py;." ^
+    --add-data "src/theme.py;." ^
+    --add-data "src/widgets.py;." ^
     --hidden-import pystray._win32 ^
-    sticky_alarm.py
+    src/sticky_alarm.py
 
 echo.
 echo Done! Output: dist\StickyAlarm.exe
