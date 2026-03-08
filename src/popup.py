@@ -1,5 +1,4 @@
 """Unignorable alarm popup — fullscreen overlay or centered card."""
-
 import tkinter as tk
 import winsound
 import os
@@ -9,21 +8,27 @@ from widgets import RoundedButton, fade_in_window
 
 
 class AlarmPopup:
-    def __init__(self, root: tk.Tk, on_snooze, on_confirm,
-                 sound_file: str = "", popup_text: str = "",
-                 fullscreen: bool = True):
+    def __init__(self, root, on_snooze, on_confirm,
+                 sound_file="", popup_text="", title="Abendroutine",
+                 snooze_label="Schlummern", confirm_label="Abendroutine starten",
+                 fullscreen=True):
         self.root = root
         self.on_snooze = on_snooze
         self.on_confirm = on_confirm
         self.sound_file = sound_file
         self.popup_text = popup_text
+        self.title = title
+        self.snooze_label = snooze_label
+        self.confirm_label = confirm_label
         self.fullscreen = fullscreen
         self.popup = None
         self._refocus_id = None
+        self._is_test = False
 
-    def show(self):
+    def show(self, is_test=False):
         if self.popup and self.popup.winfo_exists():
             return
+        self._is_test = is_test
 
         self.popup = tk.Toplevel(self.root)
         self.popup.overrideredirect(True)
@@ -33,7 +38,6 @@ class AlarmPopup:
         sy = self.popup.winfo_screenheight()
 
         if self.fullscreen:
-            # Cover entire screen — no way to click beside it
             self.popup.geometry(f"{sx}x{sy}+0+0")
             self.popup.configure(bg="#000000")
         else:
@@ -41,20 +45,15 @@ class AlarmPopup:
             x = (sx - w) // 2
             y = (sy - h) // 2
             self.popup.geometry(f"{w}x{h}+{x}+{y}")
-            self.popup.configure(bg=T.BG, highlightbackground="#252525",
-                                 highlightthickness=1)
+            self.popup.configure(bg=T.BG, highlightthickness=0)
 
-        # Prevent closing
         self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
         self.popup.bind("<Alt-F4>", lambda e: "break")
         self.popup.bind("<Escape>", lambda e: "break")
         self.popup.bind("<Alt-Key>", lambda e: "break")
 
-        # Content card — centered on screen
         if self.fullscreen:
-            # Semi-transparent dark overlay with centered card
-            card = tk.Frame(self.popup, bg=T.BG, highlightbackground="#252525",
-                            highlightthickness=1)
+            card = tk.Frame(self.popup, bg=T.BG, highlightthickness=0)
             card.place(relx=0.5, rely=0.5, anchor="center",
                        width=520, height=420)
         else:
@@ -63,7 +62,7 @@ class AlarmPopup:
         inner = tk.Frame(card, bg=T.BG)
         inner.pack(expand=True, fill="both", padx=48, pady=(44, 52))
 
-        # Alarm icon — white
+        # Alarm icon
         tk.Label(
             inner, text="\u23f0", font=("Segoe UI Emoji", 44),
             bg=T.BG, fg=T.TEXT,
@@ -71,11 +70,11 @@ class AlarmPopup:
 
         # Title
         tk.Label(
-            inner, text="Abendroutine",
+            inner, text=self.title,
             font=(T.FONT, 28, "bold"), bg=T.BG, fg=T.TEXT,
         ).pack(pady=(0, 8))
 
-        # Configurable subtitle
+        # Subtitle
         subtitle = self.popup_text or "Dein System hat heute geliefert.\nJetzt darf es sich erholen."
         tk.Label(
             inner, text=subtitle,
@@ -88,31 +87,27 @@ class AlarmPopup:
         btn_row.pack(fill="x")
 
         snooze_btn = RoundedButton(
-            btn_row, text="Schlummern",
+            btn_row, text=self.snooze_label,
             bg=T.BG_INPUT, fg=T.TEXT_SECONDARY,
             hover_bg=T.BG_HOVER, hover_fg=T.TEXT,
             command=self._on_snooze,
-            width=200, height=54, radius=16,
+            width=200, height=54, radius=22,
         )
         snooze_btn.pack(side="left")
 
         confirm_btn = RoundedButton(
-            btn_row, text="Abendroutine starten",
+            btn_row, text=self.confirm_label,
             bg=T.BG_INPUT, fg=T.TEXT,
             hover_bg=T.BG_HOVER, hover_fg=T.ACCENT,
             command=self._on_confirm,
-            width=220, height=54, radius=16,
+            width=220, height=54, radius=22,
             font=(T.FONT, T.FONT_SIZE_LG, "bold"),
         )
         confirm_btn.pack(side="right")
 
-        # Fade-in animation
         fade_in_window(self.popup, duration_ms=350)
-
-        # Sound
         self._play_sound()
         self._start_refocus()
-
         self.popup.focus_force()
         self.popup.grab_set()
 
@@ -120,9 +115,15 @@ class AlarmPopup:
         try:
             if self.sound_file and os.path.isfile(self.sound_file):
                 winsound.PlaySound(
-                    self.sound_file, winsound.SND_FILENAME | winsound.SND_ASYNC)
+                    self.sound_file, winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_LOOP)
             else:
                 winsound.MessageBeep(winsound.MB_ICONEXCLAMATION)
+        except Exception:
+            pass
+
+    def _stop_sound(self):
+        try:
+            winsound.PlaySound(None, winsound.SND_PURGE)
         except Exception:
             pass
 
@@ -152,6 +153,7 @@ class AlarmPopup:
 
     def dismiss(self):
         self._stop_refocus()
+        self._stop_sound()
         if self.popup and self.popup.winfo_exists():
             try:
                 self.popup.grab_release()
@@ -161,5 +163,5 @@ class AlarmPopup:
         self.popup = None
 
     @property
-    def is_showing(self) -> bool:
+    def is_showing(self):
         return self.popup is not None and self.popup.winfo_exists()

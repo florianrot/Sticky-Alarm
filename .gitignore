@@ -1,13 +1,21 @@
 # Build artifacts
 build/
 dist/
-*.spec
 *.exe
 
-# Python
+# Python (legacy)
 __pycache__/
 *.pyc
 *.pyo
+
+# Flutter
+.dart_tool/
+.packages
+.pub/
+pubspec.lock
+*.iml
+.metadata
+*.g.dart
 
 # IDE
 .vscode/
@@ -16,3 +24,19 @@ __pycache__/
 
 # Claude Code
 .claude/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Android
+android/.gradle/
+android/local.properties
+android/**/GeneratedPluginRegistrant.*
+*.apk
+*.aab
+
+# Windows
+windows/flutter/generated_plugin_registrant.cc
+windows/flutter/generated_plugin_registrant.h
+windows/flutter/generated_plugins.cmake

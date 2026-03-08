@@ -143,7 +143,7 @@ class RoundedEntry(tk.Canvas):
     """Entry with rounded border and focus glow animation."""
 
     def __init__(self, parent, textvariable=None, width=200, height=48,
-                 radius=12, readonly=False, justify="left", font=None):
+                 radius=14, readonly=False, justify="left", font=None):
         super().__init__(parent, width=width, height=height,
                          bg=parent.cget("bg"), highlightthickness=0, bd=0)
 
@@ -540,3 +540,114 @@ class AutoHideScrollbar(tk.Canvas):
     def _on_release(self, _e):
         self._drag_start = None
         self._schedule_hide()
+
+
+# ---------------------------------------------------------------------------
+# Collapsible Section — smooth expand/collapse
+# ---------------------------------------------------------------------------
+
+class CollapsibleSection(tk.Frame):
+    """Section with clickable header that toggles content visibility.
+    Supports optional count badge, subtitle, and custom background."""
+
+    def __init__(self, parent, title, count=None, subtitle=None,
+                 initially_open=False, bg=None, header_font=None,
+                 on_toggle=None):
+        self._bg = bg or parent.cget("bg")
+        super().__init__(parent, bg=self._bg)
+        self._is_open = initially_open
+        self._on_toggle = on_toggle
+        self._anim_id = None
+
+        self._header = tk.Frame(self, bg=self._bg, cursor="hand2")
+        self._header.pack(fill="x", pady=(4, 4))
+
+        self._arrow = tk.Label(
+            self._header, text="\u25be" if initially_open else "\u25b8",
+            font=(T.FONT, 16), bg=self._bg, fg=T.TEXT_MUTED)
+        self._arrow.pack(side="left", padx=(0, 8))
+
+        self._title_label = tk.Label(
+            self._header, text=title,
+            font=header_font or T.FONT_SECTION,
+            bg=self._bg, fg=T.TEXT)
+        self._title_label.pack(side="left")
+
+        if count is not None:
+            self._count_label = tk.Label(
+                self._header, text=f"({count})",
+                font=T.FONT_MUTED, bg=self._bg, fg=T.TEXT_MUTED)
+            self._count_label.pack(side="left", padx=(6, 0))
+        else:
+            self._count_label = None
+
+        if subtitle:
+            self._subtitle_label = tk.Label(
+                self._header, text=subtitle,
+                font=T.FONT_MUTED, bg=self._bg, fg=T.TEXT_MUTED)
+            self._subtitle_label.pack(side="left", padx=(10, 0))
+        else:
+            self._subtitle_label = None
+
+        self.content = tk.Frame(self, bg=self._bg)
+        if initially_open:
+            self.content.pack(fill="x", pady=(T.SPACE_SM, 0))
+
+        for w in (self._header, self._arrow, self._title_label):
+            w.bind("<Button-1>", self._toggle)
+        if self._count_label:
+            self._count_label.bind("<Button-1>", self._toggle)
+        if self._subtitle_label:
+            self._subtitle_label.bind("<Button-1>", self._toggle)
+
+        # Hover feedback
+        self._header_widgets = [self._header, self._arrow, self._title_label]
+        if self._count_label:
+            self._header_widgets.append(self._count_label)
+        if self._subtitle_label:
+            self._header_widgets.append(self._subtitle_label)
+
+        self._hover_bg = T.BG_SECTION_HOVER
+
+        for w in self._header_widgets:
+            w.bind("<Enter>", self._on_header_enter, add="+")
+            w.bind("<Leave>", self._on_header_leave, add="+")
+
+    @property
+    def is_open(self):
+        return self._is_open
+
+    def _toggle(self, _e=None):
+        self._is_open = not self._is_open
+        if self._is_open:
+            self.content.pack(fill="x", pady=(T.SPACE_SM, 0))
+            self._arrow.configure(text="\u25be")
+        else:
+            self.content.pack_forget()
+            self._arrow.configure(text="\u25b8")
+        if self._on_toggle:
+            self._on_toggle(self._is_open)
+
+    def _on_header_enter(self, _e=None):
+        for w in self._header_widgets:
+            w.configure(bg=self._hover_bg)
+
+    def _on_header_leave(self, _e=None):
+        for w in self._header_widgets:
+            w.configure(bg=self._bg)
+
+    def open(self):
+        if not self._is_open:
+            self._toggle()
+
+    def close(self):
+        if self._is_open:
+            self._toggle()
+
+    def update_count(self, count):
+        if self._count_label:
+            self._count_label.configure(text=f"({count})")
+
+    def update_subtitle(self, text):
+        if self._subtitle_label:
+            self._subtitle_label.configure(text=text)
