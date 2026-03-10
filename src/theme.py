@@ -1,4 +1,4 @@
-"""Design tokens — Apple-like dark theme."""
+"""Design tokens — Premium dark theme with Gold accent."""
 
 # === Colors ===
 BG = "#0f0f0f"
@@ -13,10 +13,17 @@ TEXT_SECONDARY = "#b0b0b0"
 TEXT_MUTED = "#909090"
 LABEL = "#a0a0a0"
 
-ACCENT = "#ffffff"
+ACCENT = "#c4a265"
+ACCENT_HOVER = "#d4b275"
+ACCENT_MUTED = "#8a7a55"
+ACCENT_DIM = "#2a2318"
+
 DANGER = "#ff4466"
 DANGER_DIM = "#1f0a10"
 SUCCESS = "#4ade80"
+
+BG_SHADOW = "#080808"
+FOCUS_RING = "#c4a265"
 
 # === Spacing ===
 SPACE_SM = 8
@@ -34,6 +41,7 @@ RADIUS_LG = 18
 RADIUS_XL = 22
 CARD_PADDING = 20
 CARD_GAP = 14
+CARD_RADIUS = 24
 SEPARATOR_COLOR = "#1a1a1a"
 BG_SECTION_HOVER = "#1a1a1a"   # subtle hover for collapsible headers
 BG_CARD_HOVER = "#1c1c1c"      # hover for profile card headers

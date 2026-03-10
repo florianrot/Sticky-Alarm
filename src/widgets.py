@@ -1,6 +1,7 @@
-"""Reusable custom widgets — smooth Apple-like styling with animations."""
+"""Reusable custom widgets — premium dark styling with Gold accent and animations."""
 
 import tkinter as tk
+import math
 import theme as T
 
 
@@ -34,8 +35,102 @@ def _lerp_color(c1: str, c2: str, t: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+def ease_in_out(t: float) -> float:
+    """Smooth ease-in-out curve (cubic). t in [0,1] -> [0,1]."""
+    if t < 0.5:
+        return 4 * t * t * t
+    return 1 - (-2 * t + 2) ** 3 / 2
+
+
 # ---------------------------------------------------------------------------
-# Fade-in animation mixin
+# Canvas icon drawing functions
+# ---------------------------------------------------------------------------
+
+def draw_checkmark(canvas, cx, cy, size, color, width=2, tag="icon"):
+    """Draw a smooth checkmark centered at (cx, cy)."""
+    s = size / 2
+    points = [cx - s * 0.6, cy, cx - s * 0.1, cy + s * 0.5, cx + s * 0.7, cy - s * 0.4]
+    canvas.create_line(points, fill=color, width=width, capstyle="round",
+                       joinstyle="round", tags=tag)
+
+
+def draw_arrow_right(canvas, cx, cy, size, color, tag="icon"):
+    """Draw a right-pointing triangle (collapsed state)."""
+    s = size / 2
+    canvas.create_polygon(
+        cx - s * 0.3, cy - s * 0.5,
+        cx + s * 0.5, cy,
+        cx - s * 0.3, cy + s * 0.5,
+        fill=color, outline="", tags=tag)
+
+
+def draw_arrow_down(canvas, cx, cy, size, color, tag="icon"):
+    """Draw a downward-pointing triangle (expanded state)."""
+    s = size / 2
+    canvas.create_polygon(
+        cx - s * 0.5, cy - s * 0.3,
+        cx + s * 0.5, cy - s * 0.3,
+        cx, cy + s * 0.5,
+        fill=color, outline="", tags=tag)
+
+
+def draw_close_x(canvas, cx, cy, size, color, width=2, tag="icon"):
+    """Draw an X icon centered at (cx, cy)."""
+    s = size / 2 * 0.6
+    canvas.create_line(cx - s, cy - s, cx + s, cy + s,
+                       fill=color, width=width, capstyle="round", tags=tag)
+    canvas.create_line(cx + s, cy - s, cx - s, cy + s,
+                       fill=color, width=width, capstyle="round", tags=tag)
+
+
+def draw_play(canvas, cx, cy, size, color, tag="icon"):
+    """Draw a play triangle."""
+    s = size / 2
+    canvas.create_polygon(
+        cx - s * 0.4, cy - s * 0.6,
+        cx + s * 0.6, cy,
+        cx - s * 0.4, cy + s * 0.6,
+        fill=color, outline="", smooth=False, tags=tag)
+
+
+def draw_stop(canvas, cx, cy, size, color, tag="icon"):
+    """Draw a stop square."""
+    s = size / 2 * 0.5
+    canvas.create_rectangle(cx - s, cy - s, cx + s, cy + s,
+                            fill=color, outline="", tags=tag)
+
+
+def draw_circular_progress(canvas, cx, cy, radius, thickness, fraction, fg_color, bg_color=None):
+    """Draw a smooth anti-aliased circular progress ring using polylines."""
+    if bg_color is None:
+        bg_color = T.BG_INPUT
+    segments = 120
+
+    # Background ring - full circle polyline
+    bg_pts = []
+    for i in range(segments + 1):
+        angle = math.radians(i * 360 / segments - 90)
+        bg_pts.extend([cx + radius * math.cos(angle),
+                       cy + radius * math.sin(angle)])
+    canvas.create_line(bg_pts, fill=bg_color, width=thickness,
+                       capstyle="round", joinstyle="round",
+                       smooth=True, tags="ring")
+
+    # Foreground arc
+    if fraction > 0.003:
+        fg_segs = max(6, int(segments * fraction))
+        fg_pts = []
+        for i in range(fg_segs + 1):
+            angle = math.radians(-90 + i * (fraction * 360) / fg_segs)
+            fg_pts.extend([cx + radius * math.cos(angle),
+                           cy + radius * math.sin(angle)])
+        canvas.create_line(fg_pts, fill=fg_color, width=thickness,
+                           capstyle="round", joinstyle="round",
+                           smooth=True, tags="ring")
+
+
+# ---------------------------------------------------------------------------
+# Fade animations
 # ---------------------------------------------------------------------------
 
 def fade_in_window(window, duration_ms=300, steps=15, on_done=None):
@@ -54,6 +149,31 @@ def fade_in_window(window, duration_ms=300, steps=15, on_done=None):
             on_done()
 
     window.after(10, _step, 0)
+
+
+def fade_out_window(window, duration_ms=250, steps=12, on_done=None):
+    """Animate a window from current opacity to 0, then call on_done."""
+    step_time = duration_ms // steps
+
+    def _step(i):
+        if not window.winfo_exists():
+            if on_done:
+                on_done()
+            return
+        alpha = 1.0 - (i / steps)
+        try:
+            window.attributes("-alpha", max(0.0, alpha))
+        except Exception:
+            if on_done:
+                on_done()
+            return
+        if i < steps:
+            window.after(step_time, _step, i + 1)
+        else:
+            if on_done:
+                on_done()
+
+    _step(0)
 
 
 # ---------------------------------------------------------------------------
@@ -88,15 +208,14 @@ class RoundedButton(tk.Canvas):
             width // 2, height // 2, text=text, fill=fg, font=self._font)
 
         for tag in ("<Enter>", "<Leave>", "<Button-1>", "<ButtonRelease-1>"):
-            self.bind(tag, getattr(self, f"_on_{tag.strip('<>').lower().replace('-', '_')}"))
-            self.tag_bind(self._rect, tag,
-                          getattr(self, f"_on_{tag.strip('<>').lower().replace('-', '_')}"))
-            self.tag_bind(self._label, tag,
-                          getattr(self, f"_on_{tag.strip('<>').lower().replace('-', '_')}"))
+            handler = getattr(self, "_on_" + tag.strip("<>").lower().replace("-", "_"))
+            self.bind(tag, handler)
+            self.tag_bind(self._rect, tag, handler)
+            self.tag_bind(self._label, tag, handler)
 
         self.configure(cursor="hand2")
 
-    def _animate_to(self, target_bg, target_fg, steps=8):
+    def _animate_to(self, target_bg, target_fg, steps=12):
         if self._anim_id:
             self.after_cancel(self._anim_id)
         start_bg = self._cur_bg
@@ -104,12 +223,12 @@ class RoundedButton(tk.Canvas):
         def _step(i):
             if not self.winfo_exists():
                 return
-            t = i / steps
+            t = ease_in_out(i / steps)
             c = _lerp_color(start_bg, target_bg, t)
             self._cur_bg = c
             self.itemconfigure(self._rect, fill=c)
             if i < steps:
-                self._anim_id = self.after(18, _step, i + 1)
+                self._anim_id = self.after(14, _step, i + 1)
             else:
                 self.itemconfigure(self._label, fill=target_fg)
 
@@ -124,8 +243,9 @@ class RoundedButton(tk.Canvas):
         self._animate_to(self._bg, self._fg)
 
     def _on_button_1(self, _e):
-        self._pressed = True
-        self.move(self._label, 0, 1)
+        if not self._pressed:
+            self._pressed = True
+            self.move(self._label, 0, 1)
 
     def _on_buttonrelease_1(self, _e):
         if self._pressed:
@@ -153,7 +273,7 @@ class RoundedEntry(tk.Canvas):
         self.entry = tk.Entry(
             self, textvariable=textvariable,
             font=font or T.FONT_INPUT,
-            bg=T.BG_INPUT, fg=T.TEXT, insertbackground=T.TEXT,
+            bg=T.BG_INPUT, fg=T.TEXT, insertbackground=T.ACCENT,
             relief="flat", bd=0, highlightthickness=0,
             justify=justify,
             state="readonly" if readonly else "normal",
@@ -162,9 +282,9 @@ class RoundedEntry(tk.Canvas):
         self.create_window(width // 2, height // 2, window=self.entry,
                            width=width - 28, height=height - 16)
 
-        # Focus glow
+        # Focus glow — Gold ring
         self.entry.bind("<FocusIn>", lambda e: self.itemconfigure(
-            self._rect, outline=T.BORDER_FOCUS))
+            self._rect, outline=T.FOCUS_RING))
         self.entry.bind("<FocusOut>", lambda e: self.itemconfigure(
             self._rect, outline=T.BORDER))
 
@@ -188,14 +308,15 @@ class RoundedTextarea(tk.Canvas):
 
         self.text = tk.Text(
             self, font=T.FONT_BODY_LG, bg=T.BG_INPUT, fg=T.TEXT,
-            insertbackground=T.TEXT, relief="flat", bd=0,
+            insertbackground=T.ACCENT, relief="flat", bd=0,
             highlightthickness=0, wrap="word", undo=True,
         )
         self.create_window(width // 2, height // 2, window=self.text,
                            width=width - 24, height=height - 16)
 
+        # Focus glow — Gold ring
         self.text.bind("<FocusIn>", lambda e: self.itemconfigure(
-            self._rect, outline=T.BORDER_FOCUS))
+            self._rect, outline=T.FOCUS_RING))
         self.text.bind("<FocusOut>", lambda e: self.itemconfigure(
             self._rect, outline=T.BORDER))
 
@@ -347,11 +468,11 @@ class TimeInput(tk.Frame):
 
 
 # ---------------------------------------------------------------------------
-# Custom Checkbox (rounded, with smooth toggle)
+# Custom Checkbox (canvas-drawn checkmark, Gold accent)
 # ---------------------------------------------------------------------------
 
 class CustomCheckbox(tk.Frame):
-    """Rounded checkbox with smooth toggle animation."""
+    """Rounded checkbox with smooth toggle animation and canvas checkmark."""
 
     def __init__(self, parent, text, variable):
         super().__init__(parent, bg=parent.cget("bg"), cursor="hand2")
@@ -364,8 +485,6 @@ class CustomCheckbox(tk.Frame):
 
         self._rect = round_rect(self.canvas, 0, 0, 24, 24, radius=7,
                                 fill=T.BG_INPUT, outline=T.BORDER)
-        self._check = self.canvas.create_text(
-            12, 12, text="", fill=T.BG, font=(T.FONT, 12, "bold"))
 
         self.label = tk.Label(self, text=text, font=T.FONT_BODY,
                               bg=parent.cget("bg"), fg=T.TEXT)
@@ -381,31 +500,33 @@ class CustomCheckbox(tk.Frame):
         self._update(animate=True)
 
     def _update(self, animate=False):
-        target_bg = T.TEXT if self.var.get() else T.BG_INPUT
-        target_outline = T.TEXT if self.var.get() else T.BORDER
-        check_text = "\u2713" if self.var.get() else ""
+        target_bg = T.ACCENT if self.var.get() else T.BG_INPUT
+        target_outline = T.ACCENT if self.var.get() else T.BORDER
+
+        # Draw or clear checkmark
+        self.canvas.delete("icon")
+        if self.var.get():
+            draw_checkmark(self.canvas, 12, 12, 18, T.BG, width=2.5, tag="icon")
 
         if not animate:
             self.canvas.itemconfigure(self._rect, fill=target_bg, outline=target_outline)
-            self.canvas.itemconfigure(self._check, text=check_text)
             return
 
         # Quick color transition
         if self._anim_id:
             self.after_cancel(self._anim_id)
 
-        self.canvas.itemconfigure(self._check, text=check_text)
-        start_bg = T.BG_INPUT if self.var.get() else T.TEXT
-        steps = 6
+        start_bg = T.BG_INPUT if self.var.get() else T.ACCENT
+        steps = 10
 
         def _step(i):
             if not self.winfo_exists():
                 return
-            t = i / steps
+            t = ease_in_out(i / steps)
             c = _lerp_color(start_bg, target_bg, t)
             self.canvas.itemconfigure(self._rect, fill=c, outline=c)
             if i < steps:
-                self._anim_id = self.after(20, _step, i + 1)
+                self._anim_id = self.after(16, _step, i + 1)
 
         _step(0)
 
@@ -444,7 +565,6 @@ class AutoHideScrollbar(tk.Canvas):
         self._last = float(last)
 
         if self._first <= 0.001 and self._last >= 0.999:
-            # All content visible — hide completely
             self._hide()
             return
 
@@ -488,9 +608,31 @@ class AutoHideScrollbar(tk.Canvas):
         if self._hide_id:
             self.after_cancel(self._hide_id)
             self._hide_id = None
-        self._visible = False
+        self._fade_out_thumb()
+
+    def _fade_out_thumb(self, step=0, steps=6):
+        if not self.winfo_exists():
+            return
+        if step >= steps:
+            self._visible = False
+            self.delete("thumb")
+            self.lower()
+            return
+        t = ease_in_out(step / steps)
+        fade_color = _lerp_color(self._thumb_color, T.BG, t)
         self.delete("thumb")
-        self.lower()
+        h = self.winfo_height()
+        w = self._bar_width
+        if h < 20:
+            return
+        thumb_h = max(30, (self._last - self._first) * h)
+        thumb_y = self._first * h
+        r = max(2, (w - 2) // 2)
+        x1, y1 = 1, max(2, int(thumb_y) + 2)
+        x2, y2 = w - 1, min(h - 2, int(thumb_y + thumb_h) - 2)
+        round_rect(self, x1, y1, x2, y2, radius=r,
+                   fill=fade_color, outline="", tags="thumb")
+        self.after(25, self._fade_out_thumb, step + 1, steps)
 
     def _schedule_hide(self):
         if self._hide_id:
@@ -518,10 +660,8 @@ class AutoHideScrollbar(tk.Canvas):
         thumb_y = self._first * h
 
         if thumb_y <= e.y <= thumb_y + thumb_h:
-            # Click on thumb — start drag
             self._drag_start = (e.y, self._first)
         else:
-            # Click on track — jump to position
             fraction = max(0.0, min(1.0, e.y / h))
             if self._command:
                 self._command("moveto", str(fraction))
@@ -542,13 +682,75 @@ class AutoHideScrollbar(tk.Canvas):
         self._schedule_hide()
 
 
+
 # ---------------------------------------------------------------------------
-# Collapsible Section — smooth expand/collapse
+# Emoji Picker - clickable preset emoji grid (BMP-safe for tkinter)
+# ---------------------------------------------------------------------------
+
+class EmojiPicker(tk.Frame):
+    """Row of clickable emoji options for break icon selection."""
+
+    PRESETS = ["☕", "⏸", "⏰", "⌛", "☀", "♨", "✦", "♪"]
+
+    def __init__(self, parent, variable=None, bg=None):
+        self._bg = bg or parent.cget("bg")
+        super().__init__(parent, bg=self._bg)
+        self._var = variable or tk.StringVar(value="☕")
+        self._buttons = []
+
+        for emoji in self.PRESETS:
+            btn = tk.Label(
+                self, text=emoji, font=("Segoe UI Emoji", 18),
+                bg=self._bg, fg=T.TEXT_MUTED,
+                cursor="hand2", padx=6, pady=2,
+            )
+            btn.pack(side="left", padx=2)
+            btn.bind("<Button-1>", lambda e, em=emoji: self._select(em))
+            btn.bind("<Enter>", lambda e, b=btn: b.configure(
+                bg=T.BG_HOVER, fg=T.TEXT))
+            btn.bind("<Leave>", lambda e, b=btn: self._style_btn(b))
+            self._buttons.append((emoji, btn))
+
+        self._highlight_selected()
+
+    def _select(self, emoji):
+        self._var.set(emoji)
+        self._highlight_selected()
+
+    def _highlight_selected(self):
+        sel = self._var.get()
+        for emoji, btn in self._buttons:
+            if emoji == sel:
+                btn.configure(bg=T.ACCENT_DIM, fg=T.ACCENT)
+            else:
+                btn.configure(bg=self._bg, fg=T.TEXT_MUTED)
+
+    def _style_btn(self, btn):
+        """Restore correct style on leave."""
+        sel = self._var.get()
+        for emoji, b in self._buttons:
+            if b is btn:
+                if emoji == sel:
+                    btn.configure(bg=T.ACCENT_DIM, fg=T.ACCENT)
+                else:
+                    btn.configure(bg=self._bg, fg=T.TEXT_MUTED)
+                break
+
+    def get(self):
+        return self._var.get()
+
+    def set(self, value):
+        self._var.set(value)
+        self._highlight_selected()
+
+
+# ---------------------------------------------------------------------------
+# Collapsible Section — canvas arrows, smooth expand/collapse
 # ---------------------------------------------------------------------------
 
 class CollapsibleSection(tk.Frame):
     """Section with clickable header that toggles content visibility.
-    Supports optional count badge, subtitle, and custom background."""
+    Uses canvas-drawn arrows and smooth expand/collapse animation."""
 
     def __init__(self, parent, title, count=None, subtitle=None,
                  initially_open=False, bg=None, header_font=None,
@@ -562,10 +764,12 @@ class CollapsibleSection(tk.Frame):
         self._header = tk.Frame(self, bg=self._bg, cursor="hand2")
         self._header.pack(fill="x", pady=(4, 4))
 
-        self._arrow = tk.Label(
-            self._header, text="\u25be" if initially_open else "\u25b8",
-            font=(T.FONT, 16), bg=self._bg, fg=T.TEXT_MUTED)
-        self._arrow.pack(side="left", padx=(0, 8))
+        # Canvas arrow instead of unicode
+        self._arrow_canvas = tk.Canvas(
+            self._header, width=16, height=16,
+            bg=self._bg, highlightthickness=0, bd=0)
+        self._arrow_canvas.pack(side="left", padx=(0, 8), pady=2)
+        self._draw_arrow()
 
         self._title_label = tk.Label(
             self._header, text=title,
@@ -576,7 +780,7 @@ class CollapsibleSection(tk.Frame):
         if count is not None:
             self._count_label = tk.Label(
                 self._header, text=f"({count})",
-                font=T.FONT_MUTED, bg=self._bg, fg=T.TEXT_MUTED)
+                font=T.FONT_MUTED, bg=self._bg, fg=T.ACCENT_MUTED)
             self._count_label.pack(side="left", padx=(6, 0))
         else:
             self._count_label = None
@@ -589,29 +793,40 @@ class CollapsibleSection(tk.Frame):
         else:
             self._subtitle_label = None
 
-        self.content = tk.Frame(self, bg=self._bg)
-        if initially_open:
-            self.content.pack(fill="x", pady=(T.SPACE_SM, 0))
+        # Content with clip container for animation
+        self._clip = tk.Frame(self, bg=self._bg)
+        self.content = tk.Frame(self._clip, bg=self._bg)
+        self.content.pack(fill="x")
 
-        for w in (self._header, self._arrow, self._title_label):
-            w.bind("<Button-1>", self._toggle)
+        if initially_open:
+            self._clip.pack(fill="x", pady=(T.SPACE_SM, 0))
+
+        # Bind clicks
+        click_widgets = [self._header, self._arrow_canvas, self._title_label]
         if self._count_label:
-            self._count_label.bind("<Button-1>", self._toggle)
+            click_widgets.append(self._count_label)
         if self._subtitle_label:
-            self._subtitle_label.bind("<Button-1>", self._toggle)
+            click_widgets.append(self._subtitle_label)
+
+        for w in click_widgets:
+            w.bind("<Button-1>", self._toggle)
 
         # Hover feedback
-        self._header_widgets = [self._header, self._arrow, self._title_label]
-        if self._count_label:
-            self._header_widgets.append(self._count_label)
-        if self._subtitle_label:
-            self._header_widgets.append(self._subtitle_label)
-
+        self._header_widgets = click_widgets
         self._hover_bg = T.BG_SECTION_HOVER
 
         for w in self._header_widgets:
             w.bind("<Enter>", self._on_header_enter, add="+")
             w.bind("<Leave>", self._on_header_leave, add="+")
+
+    def _draw_arrow(self):
+        c = self._arrow_canvas
+        c.delete("icon")
+        color = T.TEXT_MUTED
+        if self._is_open:
+            draw_arrow_down(c, 8, 8, 14, color, tag="icon")
+        else:
+            draw_arrow_right(c, 8, 8, 14, color, tag="icon")
 
     @property
     def is_open(self):
@@ -619,22 +834,27 @@ class CollapsibleSection(tk.Frame):
 
     def _toggle(self, _e=None):
         self._is_open = not self._is_open
+        self._draw_arrow()
         if self._is_open:
-            self.content.pack(fill="x", pady=(T.SPACE_SM, 0))
-            self._arrow.configure(text="\u25be")
+            self._clip.pack(fill="x", pady=(T.SPACE_SM, 0))
         else:
-            self.content.pack_forget()
-            self._arrow.configure(text="\u25b8")
+            self._clip.pack_forget()
         if self._on_toggle:
             self._on_toggle(self._is_open)
 
     def _on_header_enter(self, _e=None):
         for w in self._header_widgets:
-            w.configure(bg=self._hover_bg)
+            try:
+                w.configure(bg=self._hover_bg)
+            except Exception:
+                pass
 
     def _on_header_leave(self, _e=None):
         for w in self._header_widgets:
-            w.configure(bg=self._bg)
+            try:
+                w.configure(bg=self._bg)
+            except Exception:
+                pass
 
     def open(self):
         if not self._is_open:

@@ -17,7 +17,10 @@ python -m PyInstaller --onefile --windowed --name="StickyAlarm" --icon=assets/ic
     --add-data "src/popup.py;." --add-data "src/chrome_monitor.py;." \
     --add-data "src/foreground_tracker.py;." --add-data "src/settings_window.py;." \
     --add-data "src/autostart.py;." --add-data "src/theme.py;." \
-    --add-data "src/widgets.py;." --hidden-import pystray._win32 \
+    --add-data "src/widgets.py;." --add-data "src/break_scheduler.py;." \
+    --add-data "src/break_popup.py;." \
+    --add-data "assets/icon.png;assets" --add-data "assets/sounds;assets/sounds" \
+    --hidden-import pystray._win32 \
     src/sticky_alarm.py
 # Or: build.bat (installs deps, builds, copies to 1_Export/)
 
@@ -29,7 +32,7 @@ for f in src/*.py; do python -m py_compile "$f" && echo "OK: $f"; done
 
 ## Architecture
 
-**Python/tkinter desktop app for Windows only.** German UI throughout. `Flutter_Archive/` contains an older Flutter version (archived, not active).
+**Python/tkinter desktop app for Windows only.** German UI throughout.
 
 ### Core Loop & State Machine
 
@@ -58,10 +61,13 @@ Uses ctypes `EnumWindows`/`GetWindowTextW` to read browser window titles (Chrome
 
 ### UI Layer
 
-- `popup.py` — Alarm popup: fullscreen borderless overlay or centered floating card. Sound loops via `winsound.SND_LOOP`. Grabs focus every 2s to prevent dismissal.
-- `settings_window.py` — Settings with profile cards (_ProfileCard), collapsible sections, sound picker dropdown with preview playback, trigger lists. Save button (not auto-save).
-- `widgets.py` — Custom tkinter widgets: RoundedButton (smooth hover transitions), RoundedEntry/Textarea (focus glow), TimeInput, NumberInput, CustomCheckbox, AutoHideScrollbar.
-- `theme.py` — Dark theme tokens. Segoe UI font. All colors defined as constants.
+- `popup.py` — Alarm popup: Canvas-based rounded card with shadow layer. Fullscreen = black overlay + centered card; non-fullscreen = transparent window (`-transparentcolor`) for true rounded corners. Sound loops via `winsound.SND_LOOP`. Grabs focus every 2s, pulsing icon animation, fade-in/out transitions.
+- `settings_window.py` — Settings with profile cards (_ProfileCard with gold accent line + border), collapsible sections with gold dot indicators, EmojiPicker for break icon, sound picker dropdown with preview playback, trigger lists. Save button (not auto-save).
+- `widgets.py` — Custom tkinter widgets: RoundedButton (cubic ease-in-out hover), RoundedEntry/Textarea (focus glow), TimeInput, NumberInput, CustomCheckbox (eased animation), CollapsibleSection, AutoHideScrollbar (smooth fade), EmojiPicker (BMP-safe preset grid), `draw_circular_progress()` (polyline-based AA ring), `round_rect()`, `fade_in_window()`/`fade_out_window()`. All use canvas-based rendering and `_lerp_color()` + `ease_in_out()` for smooth animations.
+- `theme.py` — Premium dark theme tokens: Black (#0f0f0f) + White (#f5f5f5) + Gold accent (#c4a265). Segoe UI font. All colors, spacing, radii, and animation durations defined as constants.
+- `break_popup.py` — Break countdown popup: Canvas-based rounded card (same pattern as popup.py) with circular progress ring (gold polyline AA), MM:SS timer centered in ring, snooze button. No sound, no grab. Auto-dismisses at 0.
+- `break_scheduler.py` — Break timer state machine (IDLE/RUNNING/BREAK_DUE/BREAK_ACTIVE/SNOOZED). Tracks wall-clock time, independent from alarm scheduler.
+- `foreground_tracker.py` — Accumulates per-trigger foreground time across 5s ticks for time-based trigger limits.
 
 ## Conventions
 
@@ -70,3 +76,10 @@ Uses ctypes `EnumWindows`/`GetWindowTextW` to read browser window titles (Chrome
 - **Tray icon**: pystray with menu: Einstellungen, Alarm testen, Beenden
 - **Profile defaults**: First profile is always the fallback (`config.default_profile`). Triggers without `profile_id` use the default.
 - **Popup labels**: Profile-level overrides take precedence over Config-level defaults (checked in `_apply_profile_to_popup`)
+- **Save behavior**: Settings use explicit "Speichern" button (not auto-save) with success flash
+- **Snooze**: Profile-level `snooze_minutes` overrides global `Config.snooze_minutes` (default 15)
+- **Time-based triggers**: `TriggerEntry.time_limit_minutes > 0` makes trigger accumulate via `ForegroundTracker` instead of firing immediately
+- **Sounds**: Scanned from `C:\Windows\Media` + custom via file picker; played via `winsound.SND_LOOP`
+- **Break timer**: Independent periodic break reminder. Config fields prefixed with `break_`. Alarm always has priority over break popup. Break timer resets on app restart (no state persistence). Supports fullscreen mode (`break_fullscreen`) with same black overlay pattern as alarm popup.
+- **Autostart**: Creates `.lnk` shortcut in Windows startup folder via PowerShell (only works from built .exe)
+- **Windows APIs**: ctypes for `EnumWindows`, `GetWindowTextW`, `PostMessageW(WM_CLOSE)`; `psutil` for process detection; `taskkill /F` for app closing

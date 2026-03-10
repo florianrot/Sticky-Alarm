@@ -16,6 +16,8 @@ pyinstaller --onefile --windowed --name="StickyAlarm" --icon=assets/icon.ico ^
     --add-data "src/autostart.py;." ^
     --add-data "src/theme.py;." ^
     --add-data "src/widgets.py;." ^
+    --add-data "src/break_scheduler.py;." ^
+    --add-data "src/break_popup.py;." ^
     --add-data "assets/icon.png;assets" ^
     --add-data "assets/sounds;assets/sounds" ^
     --hidden-import pystray._win32 ^

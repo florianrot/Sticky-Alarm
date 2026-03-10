@@ -141,6 +141,14 @@ class Config:
     confirm_label: str = "Abendroutine starten"
     fullscreen_popup: bool = True
     custom_sounds: list = None
+    break_enabled: bool = False
+    break_interval_minutes: int = 60
+    break_duration_minutes: int = 5
+    break_snooze_minutes: int = 5
+    break_popup_title: str = "Pause"
+    break_popup_text: str = "Steh auf, streck dich, trink Wasser."
+    break_fullscreen: bool = False
+    break_icon: str = "☕"
 
     def __post_init__(self):
         if self.schedule_profiles is None:
@@ -205,6 +213,14 @@ class Config:
             "confirm_label": self.confirm_label,
             "fullscreen_popup": self.fullscreen_popup,
             "custom_sounds": self.custom_sounds,
+            "break_enabled": self.break_enabled,
+            "break_interval_minutes": self.break_interval_minutes,
+            "break_duration_minutes": self.break_duration_minutes,
+            "break_snooze_minutes": self.break_snooze_minutes,
+            "break_popup_title": self.break_popup_title,
+            "break_popup_text": self.break_popup_text,
+            "break_fullscreen": self.break_fullscreen,
+            "break_icon": self.break_icon,
         }
 
     def save(self):
@@ -253,6 +269,14 @@ class Config:
             confirm_label=data.get("confirm_label", "Abendroutine starten"),
             fullscreen_popup=data.get("fullscreen_popup", True),
             custom_sounds=data.get("custom_sounds", []),
+            break_enabled=data.get("break_enabled", False),
+            break_interval_minutes=data.get("break_interval_minutes", 60),
+            break_duration_minutes=data.get("break_duration_minutes", 5),
+            break_snooze_minutes=data.get("break_snooze_minutes", 5),
+            break_popup_title=data.get("break_popup_title", "Pause"),
+            break_popup_text=data.get("break_popup_text", "Steh auf, streck dich, trink Wasser."),
+            break_fullscreen=data.get("break_fullscreen", False),
+            break_icon=data.get("break_icon", "☕"),
         )
 
     @classmethod

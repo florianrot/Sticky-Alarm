@@ -14,7 +14,8 @@ import theme as T
 from widgets import (
     RoundedButton, RoundedEntry, RoundedTextarea, TimeInput,
     NumberInput, CustomCheckbox, AutoHideScrollbar, CollapsibleSection,
-    fade_in_window, round_rect,
+    EmojiPicker, fade_in_window, round_rect,
+    draw_close_x, draw_play, draw_stop,
 )
 
 
@@ -33,10 +34,12 @@ def _enable_dark_titlebar(window):
 # -- Helpers --
 
 def _section_label(parent, text):
-    tk.Label(
-        parent, text=text,
-        font=T.FONT_SECTION, bg=T.BG, fg=T.TEXT, anchor="w",
-    ).pack(anchor="w", pady=(0, 10))
+    row = tk.Frame(parent, bg=T.BG)
+    row.pack(anchor="w", fill="x", pady=(0, 10))
+    dot = tk.Canvas(row, width=8, height=8, bg=T.BG, highlightthickness=0, bd=0)
+    dot.pack(side="left", padx=(0, 10), pady=4)
+    dot.create_oval(1, 1, 7, 7, fill=T.ACCENT, outline="")
+    tk.Label(row, text=text, font=T.FONT_SECTION, bg=T.BG, fg=T.TEXT, anchor="w").pack(side="left")
 
 
 def _separator(parent):
@@ -79,8 +82,8 @@ class _SoundRow(tk.Frame):
         self._play_canvas.pack(side="left", padx=(8, 6), pady=3)
         self._play_bg = round_rect(self._play_canvas, 2, 2, 32, 32, radius=12,
                                     fill=bg, outline="")
-        self._play_icon = self._play_canvas.create_text(
-            17, 17, text="\u25b6", fill=T.TEXT_MUTED, font=(T.FONT, 12))
+        self._play_icon_items = draw_play(self._play_canvas, 17, 17, 10, T.TEXT_MUTED)
+        self._play_mode = "play"
         self._play_canvas.bind("<Button-1>", self._toggle_play)
         self._play_canvas.bind("<Enter>", self._on_play_enter)
         self._play_canvas.bind("<Leave>", self._on_play_leave)
@@ -128,16 +131,16 @@ class _SoundRow(tk.Frame):
     def _on_play_enter(self, _e):
         self._play_canvas.itemconfigure(
             self._play_bg, fill=T.BG_HOVER if not self._playing else "#2a1a1a")
-        self._play_canvas.itemconfigure(
-            self._play_icon, fill=T.TEXT if not self._playing else T.DANGER)
+        color = T.TEXT if not self._playing else T.DANGER
+        for item in self._play_icon_items:
+            self._play_canvas.itemconfigure(item, fill=color)
 
     def _on_play_leave(self, _e):
         row_bg = T.BG_INPUT if self._selected else T.BG
-        self._play_canvas.itemconfigure(
-            self._play_bg, fill=row_bg if not self._playing else row_bg)
-        self._play_canvas.itemconfigure(
-            self._play_icon,
-            fill=(T.ACCENT if self._playing else T.TEXT_MUTED))
+        self._play_canvas.itemconfigure(self._play_bg, fill=row_bg)
+        color = T.ACCENT if self._playing else T.TEXT_MUTED
+        for item in self._play_icon_items:
+            self._play_canvas.itemconfigure(item, fill=color)
 
     def _toggle_play(self, _e=None):
         if self._playing:
@@ -149,16 +152,23 @@ class _SoundRow(tk.Frame):
                 _SoundRow._active_row._set_stopped()
             _SoundRow._active_row = self
             self._playing = True
-            self._play_canvas.itemconfigure(self._play_icon,
-                                             text="\u25a0", fill=T.ACCENT)
+            self._redraw_icon("stop", T.ACCENT)
             self._on_stop()
             self._on_play(self.filepath, self._on_play_done)
+
+    def _redraw_icon(self, mode, color):
+        for item in self._play_icon_items:
+            self._play_canvas.delete(item)
+        if mode == "stop":
+            self._play_icon_items = draw_stop(self._play_canvas, 17, 17, 10, color)
+        else:
+            self._play_icon_items = draw_play(self._play_canvas, 17, 17, 10, color)
+        self._play_mode = mode
 
     def _set_stopped(self):
         self._playing = False
         if self.winfo_exists():
-            self._play_canvas.itemconfigure(self._play_icon,
-                                             text="\u25b6", fill=T.TEXT_MUTED)
+            self._redraw_icon("play", T.TEXT_MUTED)
             row_bg = T.BG_INPUT if self._selected else T.BG
             self._play_canvas.itemconfigure(self._play_bg, fill=row_bg)
 
@@ -191,12 +201,11 @@ class _TriggerRow(tk.Frame):
         remove_canvas = tk.Canvas(self, width=24, height=24,
                                    bg=row_bg, highlightthickness=0, bd=0, cursor="hand2")
         remove_canvas.pack(side="right", padx=(0, 10), pady=6)
-        _x = remove_canvas.create_text(
-            12, 12, text="\u2715", fill=T.TEXT_MUTED, font=(T.FONT, 10))
-        remove_canvas.bind("<Enter>", lambda e: remove_canvas.itemconfigure(
-            _x, fill=T.DANGER))
-        remove_canvas.bind("<Leave>", lambda e: remove_canvas.itemconfigure(
-            _x, fill=T.TEXT_MUTED))
+        _x_items = draw_close_x(remove_canvas, 12, 12, 8, T.TEXT_MUTED)
+        remove_canvas.bind("<Enter>", lambda e: [remove_canvas.itemconfigure(
+            i, fill=T.DANGER) for i in _x_items])
+        remove_canvas.bind("<Leave>", lambda e: [remove_canvas.itemconfigure(
+            i, fill=T.TEXT_MUTED) for i in _x_items])
         remove_canvas.bind("<Button-1>", lambda e: on_remove(display_name))
 
         self.bind("<Enter>", lambda e: self.configure(bg=T.BG_HOVER))
@@ -209,13 +218,18 @@ class _ProfileCard(tk.Frame):
     """Editable card for a single ScheduleProfile. Self-contained with triggers."""
 
     def __init__(self, parent, profile, triggers, config, on_delete=None, deletable=True):
-        super().__init__(parent, bg=T.BG_CARD, highlightthickness=0)
+        super().__init__(parent, bg=T.BORDER, highlightthickness=0)
         self.profile = profile
         self.config = config
         self._site_triggers = [t.name for t in triggers if t.type == "site"]
         self._app_triggers = [t.name for t in triggers if t.type == "app"]
 
-        inner = tk.Frame(self, bg=T.BG_CARD)
+        # Gold accent line at top + border wrapper
+        tk.Frame(self, bg=T.ACCENT_MUTED, height=3).pack(fill="x")
+        self._card_body = tk.Frame(self, bg=T.BG_CARD)
+        self._card_body.pack(fill="both", expand=True, padx=1, pady=(0, 1))
+
+        inner = tk.Frame(self._card_body, bg=T.BG_CARD)
         inner.pack(fill="x", padx=T.CARD_PADDING + 4, pady=(T.CARD_PADDING + 2, T.CARD_PADDING + 4))
 
         # -- Collapsible header: profile name + time display + delete --
@@ -237,9 +251,11 @@ class _ProfileCard(tk.Frame):
                                     bg=T.BG_CARD, highlightthickness=0, bd=0,
                                     cursor="hand2")
             del_canvas.pack(side="right")
-            _x = del_canvas.create_text(12, 12, text="\u2715", fill=T.TEXT_MUTED, font=(T.FONT, 10))
-            del_canvas.bind("<Enter>", lambda e: del_canvas.itemconfigure(_x, fill=T.DANGER))
-            del_canvas.bind("<Leave>", lambda e: del_canvas.itemconfigure(_x, fill=T.TEXT_MUTED))
+            _x_items = draw_close_x(del_canvas, 12, 12, 8, T.TEXT_MUTED)
+            del_canvas.bind("<Enter>", lambda e: [del_canvas.itemconfigure(
+                i, fill=T.DANGER) for i in _x_items])
+            del_canvas.bind("<Leave>", lambda e: [del_canvas.itemconfigure(
+                i, fill=T.TEXT_MUTED) for i in _x_items])
             del_canvas.bind("<Button-1>", lambda e: on_delete(profile.id))
 
         # -- Collapsible content --
@@ -685,12 +701,14 @@ class _ProfileCard(tk.Frame):
 # ====================================================================
 
 class SettingsWindow:
-    def __init__(self, root: tk.Tk, config: Config, on_save=None, on_test=None):
+    def __init__(self, root: tk.Tk, config: Config, on_save=None, on_test=None, break_scheduler=None):
         self.root = root
         self.config = config
         self.on_save = on_save
         self.on_test = on_test
+        self.break_scheduler = break_scheduler
         self.window = None
+        self._break_countdown_id = None
         self._playing_sound = False
         self._play_done_id = None
 
@@ -740,8 +758,8 @@ class SettingsWindow:
 
         self._save_btn = RoundedButton(
             btn_inner, text="Speichern",
-            bg=T.TEXT, fg=T.BG,
-            hover_bg="#e0e0e0", hover_fg=T.BG,
+            bg=T.ACCENT, fg=T.BG,
+            hover_bg=T.ACCENT_HOVER, hover_fg=T.BG,
             command=self._on_save,
             width=195, height=52, radius=22,
         )
@@ -873,6 +891,88 @@ class SettingsWindow:
         _separator(content)
 
         # ============================================
+        # 3.5 Pausentimer
+        # ============================================
+        break_sub = "Alle {} min / {} min Pause".format(
+            self.config.break_interval_minutes,
+            self.config.break_duration_minutes,
+        ) if self.config.break_enabled else "Deaktiviert"
+        self._break_section = CollapsibleSection(
+            content, "Pausentimer", subtitle=break_sub, bg=T.BG)
+        self._break_section.pack(fill="x", pady=(0, 8))
+
+        self.break_enabled_var = tk.BooleanVar(value=self.config.break_enabled)
+        CustomCheckbox(self._break_section.content, "Pausentimer aktivieren",
+                       self.break_enabled_var).pack(anchor="w", pady=(0, T.SPACE_SM))
+
+        # Live countdown to next break
+        self._break_countdown_label = tk.Label(
+            self._break_section.content, text="",
+            font=T.FONT_MUTED, bg=T.BG, fg=T.TEXT_MUTED, anchor="w")
+        self._break_countdown_label.pack(anchor="w", pady=(0, T.SPACE_SM))
+
+        interval_row = tk.Frame(self._break_section.content, bg=T.BG)
+        interval_row.pack(fill="x", pady=(0, T.SPACE_SM))
+        tk.Label(interval_row, text="Arbeitsintervall",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED).pack(side="left", padx=(0, 12))
+        self._break_interval = NumberInput(
+            interval_row, value=self.config.break_interval_minutes,
+            min_val=1, max_val=240, suffix="min")
+        self._break_interval.pack(side="left")
+
+        duration_row = tk.Frame(self._break_section.content, bg=T.BG)
+        duration_row.pack(fill="x", pady=(0, T.SPACE_SM))
+        tk.Label(duration_row, text="Pausendauer",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED).pack(side="left", padx=(0, 12))
+        self._break_duration = NumberInput(
+            duration_row, value=self.config.break_duration_minutes,
+            min_val=1, max_val=30, suffix="min")
+        self._break_duration.pack(side="left")
+
+        snooze_row = tk.Frame(self._break_section.content, bg=T.BG)
+        snooze_row.pack(fill="x", pady=(0, T.SPACE_SM))
+        tk.Label(snooze_row, text="Schlummer",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED).pack(side="left", padx=(0, 12))
+        self._break_snooze = NumberInput(
+            snooze_row, value=self.config.break_snooze_minutes,
+            min_val=1, max_val=30, suffix="min")
+        self._break_snooze.pack(side="left")
+
+        # Break title
+        title_row = tk.Frame(self._break_section.content, bg=T.BG)
+        title_row.pack(fill="x", pady=(0, T.SPACE_SM))
+        tk.Label(title_row, text="Titel",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED).pack(side="left", padx=(0, 12))
+        self._break_title_entry = RoundedEntry(
+            title_row, width=240, height=36, radius=12, font=T.FONT_BODY)
+        self._break_title_entry.pack(side="left")
+        self._break_title_entry.entry.insert(0, self.config.break_popup_title)
+
+        # Break icon picker
+        icon_row = tk.Frame(self._break_section.content, bg=T.BG)
+        icon_row.pack(fill="x", pady=(0, T.SPACE_SM))
+        tk.Label(icon_row, text="Icon",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED).pack(side="left", padx=(0, 12))
+        self._break_icon_picker = EmojiPicker(icon_row)
+        self._break_icon_picker.set(self.config.break_icon)
+        self._break_icon_picker.pack(side="left")
+
+        # Break text
+        tk.Label(self._break_section.content, text="Nachricht",
+                 font=T.FONT_BODY, bg=T.BG, fg=T.TEXT_MUTED, anchor="w").pack(anchor="w", pady=(0, 4))
+        self._break_text_entry = RoundedTextarea(
+            self._break_section.content, width=380, height=70, radius=12)
+        self._break_text_entry.pack(fill="x", pady=(0, T.SPACE_SM))
+        self._break_text_entry.set_text(self.config.break_popup_text)
+
+        self.break_fullscreen_var = tk.BooleanVar(value=self.config.break_fullscreen)
+        CustomCheckbox(self._break_section.content,
+                       "Fullscreen (ganzer Bildschirm)",
+                       self.break_fullscreen_var).pack(anchor="w", pady=(0, T.SPACE_SM))
+
+        _separator(content)
+
+        # ============================================
         # 4. Autostart
         # ============================================
         autostart_section = CollapsibleSection(content, "Autostart", bg=T.BG)
@@ -884,6 +984,7 @@ class SettingsWindow:
 
         # Fade-in
         fade_in_window(self.window, duration_ms=250)
+        self._update_break_countdown()
 
     # -- Profile Cards --
 
@@ -1174,8 +1275,8 @@ class SettingsWindow:
 
     def _reset_save_btn(self):
         if self.window and self.window.winfo_exists():
-            self._save_btn._cur_bg = T.TEXT
-            self._save_btn.itemconfigure(self._save_btn._rect, fill=T.TEXT)
+            self._save_btn._cur_bg = T.ACCENT
+            self._save_btn.itemconfigure(self._save_btn._rect, fill=T.ACCENT)
             self._save_btn.itemconfigure(self._save_btn._label, text="Speichern", fill=T.BG)
 
     def _do_save(self):
@@ -1198,6 +1299,24 @@ class SettingsWindow:
             disable_autostart()
         self.config.autostart = self.autostart_var.get()
 
+        self.config.break_enabled = self.break_enabled_var.get()
+        self.config.break_interval_minutes = self._break_interval.get()
+        self.config.break_duration_minutes = self._break_duration.get()
+        self.config.break_snooze_minutes = self._break_snooze.get()
+        self.config.break_popup_title = self._break_title_entry.get().strip() or "Pause"
+        self.config.break_popup_text = self._break_text_entry.get_text().strip() or "Steh auf, streck dich, trink Wasser."
+        self.config.break_fullscreen = self.break_fullscreen_var.get()
+        self.config.break_icon = self._break_icon_picker.get() or "☕"
+
+        # Update subtitle
+        if self.config.break_enabled:
+            sub = "Alle {} min / {} min Pause".format(
+                self.config.break_interval_minutes,
+                self.config.break_duration_minutes)
+        else:
+            sub = "Deaktiviert"
+        self._break_section.update_subtitle(sub)
+
         self.config.save()
         if self.on_save:
             self.on_save()
@@ -1207,7 +1326,43 @@ class SettingsWindow:
         if self.on_test:
             self.on_test()
 
+    def _update_break_countdown(self):
+        """Update the live countdown label for the break timer."""
+        if not self.window or not self.window.winfo_exists():
+            self._break_countdown_id = None
+            return
+        if self.break_scheduler and self.break_scheduler.config.break_enabled:
+            from break_scheduler import BreakState
+            state = self.break_scheduler.state
+            remaining = self.break_scheduler.remaining_until_break_seconds()
+            if state == BreakState.RUNNING and remaining > 0:
+                mins, secs = divmod(remaining, 60)
+                self._break_countdown_label.configure(
+                    text=f"Nächste Pause in {mins:02d}:{secs:02d}")
+            elif state == BreakState.BREAK_ACTIVE:
+                br = self.break_scheduler.remaining_break_seconds()
+                mins, secs = divmod(br, 60)
+                self._break_countdown_label.configure(
+                    text=f"Pause läuft: {mins:02d}:{secs:02d}")
+            elif state == BreakState.SNOOZED and remaining > 0:
+                mins, secs = divmod(remaining, 60)
+                self._break_countdown_label.configure(
+                    text=f"Schlummert: {mins:02d}:{secs:02d}")
+            elif state == BreakState.BREAK_DUE:
+                self._break_countdown_label.configure(text="Pause fällig")
+            else:
+                self._break_countdown_label.configure(text="")
+        else:
+            self._break_countdown_label.configure(text="")
+        self._break_countdown_id = self.window.after(1000, self._update_break_countdown)
+
     def _close(self):
+        if self._break_countdown_id:
+            try:
+                self.window.after_cancel(self._break_countdown_id)
+            except Exception:
+                pass
+            self._break_countdown_id = None
         self._stop_preview()
         self._close_sound_popup()
         try:

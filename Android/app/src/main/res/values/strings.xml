@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Sticky Alarm</string>
+
+    <!-- General -->
+    <string name="einstellungen">Einstellungen</string>
+    <string name="speichern">Speichern</string>
+    <string name="gespeichert">Gespeichert ✓</string>
+    <string name="alarm_testen">Alarm testen</string>
+    <string name="beenden">Beenden</string>
+    <string name="abbrechen">Abbrechen</string>
+    <string name="hinzufuegen">+ Hinzufügen</string>
+    <string name="loeschen">Löschen</string>
+    <string name="minuten">Minuten</string>
+
+    <!-- Alarm defaults -->
+    <string name="default_alarm_title">Alarm</string>
+    <string name="default_alarm_text">Dein System hat heute geliefert.
+Jetzt darf es sich erholen.</string>
+    <string name="default_snooze_label">Schlummern</string>
+    <string name="default_confirm_label">Abendroutine starten</string>
+
+    <!-- Settings sections -->
+    <string name="zeitprofile">Zeitprofile</string>
+    <string name="alarm_anzeige">Alarm-Anzeige</string>
+    <string name="pausentimer">Pausentimer</string>
+    <string name="berechtigungen">Berechtigungen</string>
+
+    <!-- Profile -->
+    <string name="name">Name</string>
+    <string name="von">Von</string>
+    <string name="bis">Bis</string>
+    <string name="schlummer_intervall">Schlummer-Intervall</string>
+    <string name="app_trigger">App-Trigger</string>
+    <string name="alarm_texte">Alarm-Texte anpassen</string>
+    <string name="alarm_titel_optional">Alarm-Titel (optional)</string>
+    <string name="alarm_nachricht_optional">Alarm-Nachricht (optional)</string>
+    <string name="schlummern_button_optional">Schlummern-Button (optional)</string>
+    <string name="bestaetigen_button_optional">Bestätigen-Button (optional)</string>
+    <string name="auto_start_apps">Apps starten bei Bestätigung</string>
+    <string name="keine_apps_konfiguriert">Keine Apps konfiguriert</string>
+    <string name="neues_profil">+ Neues Profil</string>
+    <string name="profil_loeschen">Profil löschen</string>
+    <string name="profil_loeschen_bestaetigen">Dieses Profil wirklich löschen?</string>
+    <string name="zeitlimit_min">Zeitlimit (Min)</string>
+    <string name="app_auswaehlen">App auswählen</string>
+    <string name="app_suchen">App suchen…</string>
+
+    <!-- Sound -->
+    <string name="kein_sound">Kein Sound</string>
+
+    <!-- Display -->
+    <string name="fullscreen_alarm">Fullscreen-Alarm (ganzer Bildschirm)</string>
+    <string name="vibration">Vibration</string>
+
+    <!-- Break timer -->
+    <string name="pausentimer_aktivieren">Pausentimer aktivieren</string>
+    <string name="arbeitsintervall">Arbeitsintervall</string>
+    <string name="pausendauer">Pausendauer</string>
+    <string name="schlummer">Schlummer</string>
+    <string name="titel">Titel</string>
+    <string name="nachricht">Nachricht</string>
+    <string name="default_break_title">Pause</string>
+    <string name="default_break_text">Steh auf, streck dich, trink Wasser.</string>
+    <string name="break_fullscreen">Fullscreen (ganzer Bildschirm)</string>
+    <string name="deaktiviert">Deaktiviert</string>
+
+    <!-- Permissions -->
+    <string name="perm_usage_stats">App-Nutzungsstatistiken</string>
+    <string name="perm_usage_stats_desc">Erforderlich um zu erkennen welche App aktiv ist</string>
+    <string name="perm_battery">Akku-Optimierung deaktivieren</string>
+    <string name="perm_battery_desc">Verhindert dass Android den Dienst beendet</string>
+    <string name="perm_notifications">Benachrichtigungen</string>
+    <string name="perm_notifications_desc">Für Alarm- und Status-Benachrichtigungen</string>
+    <string name="erteilen">Erteilen</string>
+    <string name="erteilt">Erteilt ✓</string>
+
+    <!-- Notification channels -->
+    <string name="service_channel_name">Sticky Alarm Dienst</string>
+    <string name="alarm_channel_name">Alarm</string>
+    <string name="notification_channel_service">Sticky Alarm Dienst</string>
+    <string name="notification_channel_service_desc">Hintergrunddienst für App-Überwachung</string>
+    <string name="notification_channel_alarm">Alarm</string>
+    <string name="notification_channel_alarm_desc">Alarm-Benachrichtigungen</string>
+    <string name="notification_channel_break">Pausentimer</string>
+    <string name="notification_channel_break_desc">Benachrichtigungen für Pausen</string>
+    <string name="alarm_notification_text">Tippen zum Öffnen</string>
+    <string name="service_notification_waiting">Aktiv</string>
+    <string name="service_notification_snoozed">Geschlummert bis %s</string>
+    <string name="service_notification_confirmed">Überwacht Apps…</string>
+    <string name="service_notification_break">Nächste Pause in %d Min</string>
+    <string name="autostart_boot">Autostart nach Neustart</string>
+</resources>

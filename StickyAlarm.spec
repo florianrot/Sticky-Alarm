@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\sticky_alarm.py'],
     pathex=[],
     binaries=[],
-    datas=[('src/config.py', '.'), ('src/scheduler.py', '.'), ('src/popup.py', '.'), ('src/chrome_monitor.py', '.'), ('src/foreground_tracker.py', '.'), ('src/settings_window.py', '.'), ('src/autostart.py', '.'), ('src/theme.py', '.'), ('src/widgets.py', '.'), ('assets/icon.png', 'assets'), ('assets/sounds', 'assets/sounds')],
+    datas=[('src/config.py', '.'), ('src/scheduler.py', '.'), ('src/popup.py', '.'), ('src/chrome_monitor.py', '.'), ('src/foreground_tracker.py', '.'), ('src/settings_window.py', '.'), ('src/autostart.py', '.'), ('src/theme.py', '.'), ('src/widgets.py', '.'), ('src/break_scheduler.py', '.'), ('src/break_popup.py', '.'), ('assets/icon.png', 'assets'), ('assets/sounds', 'assets/sounds')],
     hiddenimports=['pystray._win32'],
     hookspath=[],
     hooksconfig={},

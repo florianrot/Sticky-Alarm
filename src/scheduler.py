@@ -15,6 +15,7 @@ class Scheduler:
         self.config = config
         self.state = State.WAITING
         self._snooze_after = None
+        self._snooze_start = None
         self._was_in_window = self._is_in_window()
 
     def _is_in_window(self):
@@ -28,6 +29,7 @@ class Scheduler:
         if not in_window:
             self.state = State.WAITING
             self._snooze_after = None
+            self._snooze_start = None
             self._was_in_window = False
             return self.state
 
@@ -41,13 +43,20 @@ class Scheduler:
             if self._snooze_after and now >= self._snooze_after:
                 self.state = State.ACTIVE
                 self._snooze_after = None
+                self._snooze_start = None
 
         return self.state
 
     def snooze(self, snooze_minutes=None):
         self.state = State.SNOOZED
         minutes = snooze_minutes or self.config.snooze_minutes
-        self._snooze_after = datetime.now() + timedelta(minutes=minutes)
+        self._snooze_start = datetime.now()
+        self._snooze_after = self._snooze_start + timedelta(minutes=minutes)
+
+    def update_snooze_duration(self, new_minutes):
+        """Update snooze end time if currently snoozed."""
+        if self.state == State.SNOOZED and self._snooze_start:
+            self._snooze_after = self._snooze_start + timedelta(minutes=new_minutes)
 
     def confirm_routine(self):
         self.state = State.CONFIRMED

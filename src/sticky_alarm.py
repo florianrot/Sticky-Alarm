@@ -14,6 +14,8 @@ from popup import AlarmPopup
 from chrome_monitor import get_active_matches, close_trigger_apps, is_app_window_open
 from foreground_tracker import ForegroundTracker
 from settings_window import SettingsWindow
+from break_scheduler import BreakScheduler, BreakState
+from break_popup import BreakPopup
 
 
 class StickyAlarmApp:
@@ -42,10 +44,17 @@ class StickyAlarmApp:
             confirm_label=self.config.confirm_label,
             fullscreen=self.config.fullscreen_popup,
         )
+        self.break_scheduler = BreakScheduler(self.config)
         self.settings = SettingsWindow(
             self.root, self.config,
             on_save=self._on_settings_saved,
             on_test=self._on_test,
+            break_scheduler=self.break_scheduler,
+        )
+        self.break_popup = BreakPopup(
+            self.root,
+            on_snooze=self._on_break_snooze,
+            on_complete=self._on_break_complete,
         )
         self.tray_icon = None
 
@@ -139,6 +148,22 @@ class StickyAlarmApp:
             if self.popup.is_showing:
                 self.popup.dismiss()
 
+        # Break timer (independent)
+        break_state = self.break_scheduler.tick()
+        if break_state == BreakState.BREAK_DUE and not self.break_popup.is_showing:
+            if not self.popup.is_showing:
+                self.break_scheduler.start_break()
+                self.break_popup.show(
+                    self.config.break_duration_minutes * 60,
+                    title=self.config.break_popup_title,
+                    text=self.config.break_popup_text,
+                    fullscreen=self.config.break_fullscreen,
+                    icon=self.config.break_icon)
+        elif self.popup.is_showing and self.break_popup.is_showing:
+            # Alarm takes priority — dismiss break
+            self.break_popup.dismiss()
+            self.break_scheduler.skip_break()
+
     def _apply_profile_to_popup(self, profile):
         if profile:
             self.popup.title = profile.alarm_title or self.config.popup_title
@@ -197,8 +222,32 @@ class StickyAlarmApp:
             self.popup.show(is_test=True)
         self.root.after(0, _trigger)
 
+    def _on_break_snooze(self):
+        self.break_scheduler.snooze()
+
+    def _on_break_complete(self):
+        self.break_scheduler.skip_break()
+
     def _on_settings_saved(self):
         self.scheduler.config = self.config
+        self.break_scheduler.config = self.config
+        self.break_scheduler.reload_config()
+
+        # Re-lookup active profile from new config (old reference is stale)
+        if self._active_profile:
+            old_id = self._active_profile.id
+            self._active_profile = None
+            for p in self.config.schedule_profiles:
+                if p.id == old_id:
+                    self._active_profile = p
+                    break
+
+        # Update snooze duration if currently snoozed
+        if self.scheduler.state == State.SNOOZED:
+            profile = self._active_profile or self.config.default_profile
+            new_snooze = profile.snooze_minutes or self.config.snooze_minutes
+            self.scheduler.update_snooze_duration(new_snooze)
+
         self._apply_profile_to_popup(self._active_profile)
 
     def _quit(self, *_args):

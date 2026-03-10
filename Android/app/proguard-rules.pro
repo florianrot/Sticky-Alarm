@@ -1,0 +1,3 @@
+-keep class com.stickyalarm.data.model.** { *; }
+-keepattributes *Annotation*
+-keep class * extends androidx.lifecycle.ViewModel { *; }

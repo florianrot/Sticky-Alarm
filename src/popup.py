@@ -1,10 +1,10 @@
-"""Unignorable alarm popup — fullscreen overlay or centered card."""
+"""Unignorable alarm popup — fullscreen overlay or centered card with rounded corners."""
 import tkinter as tk
 import winsound
 import os
 
 import theme as T
-from widgets import RoundedButton, fade_in_window
+from widgets import RoundedButton, fade_in_window, fade_out_window, round_rect
 
 
 class AlarmPopup:
@@ -23,7 +23,9 @@ class AlarmPopup:
         self.fullscreen = fullscreen
         self.popup = None
         self._refocus_id = None
+        self._pulse_id = None
         self._is_test = False
+        self._icon_label = None
 
     def show(self, is_test=False):
         if self.popup and self.popup.winfo_exists():
@@ -37,36 +39,56 @@ class AlarmPopup:
         sx = self.popup.winfo_screenwidth()
         sy = self.popup.winfo_screenheight()
 
+        cw, ch = 520, 420
+        radius = T.CARD_RADIUS
+        margin = 10
+
         if self.fullscreen:
             self.popup.geometry(f"{sx}x{sy}+0+0")
             self.popup.configure(bg="#000000")
+
+            card_canvas = tk.Canvas(
+                self.popup, width=cw + margin * 2, height=ch + margin * 2,
+                bg="#000000", highlightthickness=0, bd=0)
+            card_canvas.place(relx=0.5, rely=0.5, anchor="center")
         else:
-            w, h = 520, 420
-            x = (sx - w) // 2
-            y = (sy - h) // 2
-            self.popup.geometry(f"{w}x{h}+{x}+{y}")
-            self.popup.configure(bg=T.BG, highlightthickness=0)
+            pw, ph = cw + margin * 2, ch + margin * 2
+            x, y = (sx - pw) // 2, (sy - ph) // 2
+            self.popup.geometry(f"{pw}x{ph}+{x}+{y}")
+            self.popup.configure(bg="#FF00FF")
+            self.popup.attributes("-transparentcolor", "#FF00FF")
+
+            card_canvas = tk.Canvas(
+                self.popup, width=pw, height=ph,
+                bg="#FF00FF", highlightthickness=0, bd=0)
+            card_canvas.pack(fill="both", expand=True)
 
         self.popup.protocol("WM_DELETE_WINDOW", lambda: None)
         self.popup.bind("<Alt-F4>", lambda e: "break")
         self.popup.bind("<Escape>", lambda e: "break")
         self.popup.bind("<Alt-Key>", lambda e: "break")
 
-        if self.fullscreen:
-            card = tk.Frame(self.popup, bg=T.BG, highlightthickness=0)
-            card.place(relx=0.5, rely=0.5, anchor="center",
-                       width=520, height=420)
-        else:
-            card = self.popup
+        # Shadow layer
+        round_rect(card_canvas, margin + 4, margin + 4,
+                   margin + cw + 4, margin + ch + 4,
+                   radius=radius, fill=T.BG_SHADOW, outline="")
+        # Card background
+        round_rect(card_canvas, margin, margin,
+                   margin + cw, margin + ch,
+                   radius=radius, fill=T.BG, outline=T.BORDER)
 
-        inner = tk.Frame(card, bg=T.BG)
-        inner.pack(expand=True, fill="both", padx=48, pady=(44, 52))
+        # Content frame
+        inner = tk.Frame(card_canvas, bg=T.BG)
+        card_canvas.create_window(
+            margin + cw // 2, margin + ch // 2,
+            window=inner, width=cw - 96, height=ch - 80)
 
-        # Alarm icon
-        tk.Label(
+        # Alarm icon (pulsing)
+        self._icon_label = tk.Label(
             inner, text="\u23f0", font=("Segoe UI Emoji", 44),
-            bg=T.BG, fg=T.TEXT,
-        ).pack(pady=(0, 10))
+            bg=T.BG, fg=T.ACCENT,
+        )
+        self._icon_label.pack(pady=(0, 10))
 
         # Title
         tk.Label(
@@ -86,30 +108,61 @@ class AlarmPopup:
         btn_row = tk.Frame(inner, bg=T.BG)
         btn_row.pack(fill="x")
 
-        snooze_btn = RoundedButton(
+        RoundedButton(
             btn_row, text=self.snooze_label,
             bg=T.BG_INPUT, fg=T.TEXT_SECONDARY,
             hover_bg=T.BG_HOVER, hover_fg=T.TEXT,
             command=self._on_snooze,
             width=200, height=54, radius=22,
-        )
-        snooze_btn.pack(side="left")
+        ).pack(side="left")
 
-        confirm_btn = RoundedButton(
+        RoundedButton(
             btn_row, text=self.confirm_label,
-            bg=T.BG_INPUT, fg=T.TEXT,
-            hover_bg=T.BG_HOVER, hover_fg=T.ACCENT,
+            bg=T.ACCENT, fg=T.BG,
+            hover_bg=T.ACCENT_HOVER, hover_fg=T.BG,
             command=self._on_confirm,
             width=220, height=54, radius=22,
             font=(T.FONT, T.FONT_SIZE_LG, "bold"),
-        )
-        confirm_btn.pack(side="right")
+        ).pack(side="right")
 
         fade_in_window(self.popup, duration_ms=350)
         self._play_sound()
         self._start_refocus()
+        self._start_pulse()
         self.popup.focus_force()
         self.popup.grab_set()
+
+    def _start_pulse(self):
+        """Pulse the alarm icon between ACCENT and ACCENT_MUTED."""
+        self._pulse_step = 0
+        self._pulse_direction = 1
+        self._pulse_tick()
+
+    def _pulse_tick(self):
+        if not self.popup or not self.popup.winfo_exists() or not self._icon_label:
+            return
+        steps = 20
+        t = self._pulse_step / steps
+        r1, g1, b1 = int(T.ACCENT[1:3], 16), int(T.ACCENT[3:5], 16), int(T.ACCENT[5:7], 16)
+        r2, g2, b2 = int(T.ACCENT_MUTED[1:3], 16), int(T.ACCENT_MUTED[3:5], 16), int(T.ACCENT_MUTED[5:7], 16)
+        r = int(r1 + (r2 - r1) * t)
+        g = int(g1 + (g2 - g1) * t)
+        b = int(b1 + (b2 - b1) * t)
+        color = f"#{r:02x}{g:02x}{b:02x}"
+        self._icon_label.configure(fg=color)
+
+        self._pulse_step += self._pulse_direction
+        if self._pulse_step >= steps:
+            self._pulse_direction = -1
+        elif self._pulse_step <= 0:
+            self._pulse_direction = 1
+
+        self._pulse_id = self.root.after(80, self._pulse_tick)
+
+    def _stop_pulse(self):
+        if self._pulse_id:
+            self.root.after_cancel(self._pulse_id)
+            self._pulse_id = None
 
     def _play_sound(self):
         try:
@@ -144,15 +197,34 @@ class AlarmPopup:
             self._refocus_id = None
 
     def _on_snooze(self):
-        self.dismiss()
-        self.on_snooze()
+        self._fade_dismiss(self.on_snooze)
 
     def _on_confirm(self):
-        self.dismiss()
-        self.on_confirm()
+        self._fade_dismiss(self.on_confirm)
+
+    def _fade_dismiss(self, callback):
+        self._stop_refocus()
+        self._stop_pulse()
+        self._stop_sound()
+        if self.popup and self.popup.winfo_exists():
+            try:
+                self.popup.grab_release()
+            except Exception:
+                pass
+            fade_out_window(self.popup, duration_ms=250, on_done=lambda: self._destroy_and_call(callback))
+        else:
+            self.popup = None
+            callback()
+
+    def _destroy_and_call(self, callback):
+        if self.popup and self.popup.winfo_exists():
+            self.popup.destroy()
+        self.popup = None
+        callback()
 
     def dismiss(self):
         self._stop_refocus()
+        self._stop_pulse()
         self._stop_sound()
         if self.popup and self.popup.winfo_exists():
             try:
